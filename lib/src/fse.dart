@@ -207,7 +207,11 @@ int fseDecodeInterleaved(
   var at = outStart;
 
   while (true) {
-    if (at + 2 > outLimit) {
+    // Three, not two: both exhausted branches below write a third symbol in
+    // the same pass. Guarding for two let `at` reach outLimit exactly, which
+    // is one past the end of the caller's buffer, and a crafted weight
+    // stream turned that into an IndexError rather than a refusal.
+    if (at + 3 > outLimit) {
       throw const ZstdException('FSE stream longer than its output allows');
     }
     out[at++] = symbol[state1];
