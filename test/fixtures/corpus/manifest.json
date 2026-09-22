@@ -1,0 +1,157 @@
+[
+  {
+    "name": "twoframes",
+    "frame": "twoframes.zst",
+    "command": "python3: pyzstd.compress(A, 3) + pyzstd.compress(B, 3), A = 5000 xorshift64 bytes, B = b'the quick brown fox ' * 500",
+    "verdict": "legal",
+    "plain": [
+      "A.raw.gz",
+      "B.raw.gz"
+    ],
+    "size": 15000,
+    "trailing": "a second complete frame"
+  },
+  {
+    "name": "checksum_good",
+    "frame": "checksum_good.zst",
+    "command": "zstd -q -c -3 --check A.bin",
+    "verdict": "legal",
+    "plain": [
+      "A.raw.gz"
+    ],
+    "size": 5000
+  },
+  {
+    "name": "checksum_flipped",
+    "frame": "checksum_good.zst",
+    "command": "zstd -q -c -3 --check A.bin, then the last checksum byte flipped",
+    "verdict": "refused",
+    "why": "pyzstd refuses it: ZstdError",
+    "derive": "the last checksum byte flipped"
+  },
+  {
+    "name": "checksum_zeroed",
+    "frame": "checksum_good.zst",
+    "command": "zstd -q -c -3 --check A.bin, then all four checksum bytes zeroed",
+    "verdict": "refused",
+    "why": "pyzstd refuses it: ZstdError",
+    "derive": "all four checksum bytes zeroed"
+  },
+  {
+    "name": "checksum_truncated",
+    "frame": "checksum_good.zst",
+    "command": "zstd -q -c -3 --check A.bin, then the last two bytes cut",
+    "verdict": "refused",
+    "why": "pyzstd refuses it: ZstdError",
+    "derive": "the last two bytes cut"
+  },
+  {
+    "name": "fcs_max_u64",
+    "frame": "fcs_max_u64.zst",
+    "command": "python3: pyzstd.compress(b'hello world', 3) with the descriptor rewritten to Frame_Content_Size_flag=3 declaring 18446744073709551615",
+    "verdict": "refused",
+    "why": "a 27-byte frame asking for a size no allocator will give; pyzstd refuses it: ZstdError"
+  },
+  {
+    "name": "fcs_2p40",
+    "frame": "fcs_2p40.zst",
+    "command": "python3: pyzstd.compress(b'hello world', 3) with the descriptor rewritten to Frame_Content_Size_flag=3 declaring 1099511627776",
+    "verdict": "refused",
+    "why": "a 27-byte frame asking for a size no allocator will give; pyzstd refuses it: MemoryError"
+  },
+  {
+    "name": "fcs8",
+    "frame": "fcs8.zst",
+    "command": "python3: pyzstd.compress(B, 3) with the descriptor rewritten to Frame_Content_Size_flag=3 and an 8-byte size",
+    "verdict": "legal",
+    "plain": [
+      "B.raw.gz"
+    ],
+    "size": 10000
+  },
+  {
+    "name": "huf_weight_overrun",
+    "frame": "huf_weight_overrun.zst",
+    "command": "hand-built: a compressed block whose Huffman weight description is [0x10, 0x3F] and whose FSE weight stream is 33 x 0xAA then 0x02",
+    "verdict": "refused",
+    "why": "the weight stream decodes past the 256th weight; pyzstd refuses it: ZstdError"
+  },
+  {
+    "name": "rlelit_fmt0_R31",
+    "frame": "rlelit_fmt0_R31.zst",
+    "command": "hand-built: one compressed block, RLE literals Size_Format=0, Regenerated_Size=31, byte 0x5A, Number_of_Sequences=0",
+    "verdict": "legal",
+    "plain": [
+      "rlelit_fmt0_R31.raw.gz"
+    ],
+    "size": 31
+  },
+  {
+    "name": "rlelit_fmt1_R4000",
+    "frame": "rlelit_fmt1_R4000.zst",
+    "command": "hand-built: one compressed block, RLE literals Size_Format=1, Regenerated_Size=4000, byte 0x5A, Number_of_Sequences=0",
+    "verdict": "legal",
+    "plain": [
+      "rlelit_fmt1_R4000.raw.gz"
+    ],
+    "size": 4000
+  },
+  {
+    "name": "rlelit_fmt2_R70000",
+    "frame": "rlelit_fmt2_R70000.zst",
+    "command": "hand-built: one compressed block, RLE literals Size_Format=2, Regenerated_Size=70000, byte 0x5A, Number_of_Sequences=0",
+    "verdict": "legal",
+    "plain": [
+      "rlelit_fmt2_R70000.raw.gz"
+    ],
+    "size": 70000
+  },
+  {
+    "name": "rlelit_fmt2_R131072",
+    "frame": "rlelit_fmt2_R131072.zst",
+    "command": "hand-built: one compressed block, RLE literals Size_Format=2, Regenerated_Size=131072, byte 0x5A, Number_of_Sequences=0",
+    "verdict": "legal",
+    "plain": [
+      "rlelit_fmt2_R131072.raw.gz"
+    ],
+    "size": 131072
+  },
+  {
+    "name": "mixed_rle_raw",
+    "frame": "mixed_rle_raw.zst",
+    "command": "hand-built: [RLE 5000 x 0xAB][raw 33 bytes][RLE 40000 x 0x07] in one frame",
+    "verdict": "legal",
+    "plain": [
+      "mixed_rle_raw.raw.gz"
+    ],
+    "size": 45033
+  },
+  {
+    "name": "nofcs_windowed",
+    "frame": "nofcs_windowed.zst",
+    "command": "zstd -3 --no-check from stdin over b'the quick brown fox jumps over the lazy dog. ' * 24000",
+    "verdict": "legal",
+    "plain": [
+      "text.raw.gz"
+    ],
+    "size": 1080000,
+    "expectedSize": 1080000
+  },
+  {
+    "name": "direct_nibble",
+    "frame": "direct_nibble.zst",
+    "command": "block 183 of path/to/srtm1z/N00E042.hgtz, lifted out as its own frame; its literals carry the direct-nibble Huffman weight form",
+    "verdict": "legal",
+    "plain": [
+      "direct_nibble.raw.gz"
+    ],
+    "size": 131072
+  },
+  {
+    "name": "dictflag",
+    "frame": "dictflag.zst",
+    "command": "python3: pyzstd.compress(A, 3) with Dictionary_ID_flag forced to 1 in the frame header descriptor",
+    "verdict": "refused",
+    "why": "a dictionary this decoder does not have; pyzstd refuses it: ZstdError"
+  }
+]
