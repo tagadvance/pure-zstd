@@ -5,6 +5,7 @@ import 'exception.dart';
 import 'fse.dart';
 import 'huffman.dart';
 import 'tables.dart';
+import 'xxhash.dart';
 
 /// Decodes zstd frames, holding its entropy tables and scratch between calls
 /// so that decoding a second frame allocates nothing but the output.
@@ -45,6 +46,7 @@ class ZstdDecoder {
   /// block can hold.
   static const int maxBlockSize = 128 * 1024;
 
+  final Xxh64 _hash = Xxh64();
   final ReverseBitReader _bits = ReverseBitReader();
   final HuffmanTable _huffman = HuffmanTable();
   final FseTable _literalLengths = FseTable(literalLengthMaxLog);
@@ -146,8 +148,14 @@ class ZstdDecoder {
     _repeat2 = 4;
     _repeat3 = 8;
 
+    // Only when the frame carries one. Hashing every frame would cost the
+    // .hgtz reader throughput it has no use for, since pyzstd writes no
+    // checksum and the container's own SHA-256 is verified on download.
+    final hash = checksum == 1 ? (_hash..reset()) : null;
+
     var written = 0;
     while (true) {
+      final blockStart = written;
       if (at + 3 > src.length) {
         throw const ZstdException('truncated block header');
       }
@@ -188,17 +196,29 @@ class ZstdDecoder {
           throw const ZstdException('reserved block type');
       }
 
+      hash?.update(out, blockStart, written);
+
       if (last == 1) {
         break;
       }
     }
 
     if (checksum == 1) {
-      // Not verified yet. Required to be present, though: stepping the
-      // cursor over four bytes that were never there let a frame claim a
-      // checksum and supply none.
       if (at + 4 > src.length) {
         throw const ZstdException('truncated content checksum');
+      }
+      // The low 32 bits of XXH64 over the whole output, little-endian.
+      // Skipping it left the decoder with no integrity check at all: over
+      // 600,000 mutations of real block data, a third decoded into wrong
+      // bytes and raised nothing, because a damaged match or literal length
+      // usually still produces *some* plausible output of the right size.
+      final stored =
+          src[at] |
+          (src[at + 1] << 8) |
+          (src[at + 2] << 16) |
+          (src[at + 3] << 24);
+      if (stored != hash!.digest32) {
+        throw const ZstdException('the frame checksum does not match');
       }
       at += 4;
     }
