@@ -12,7 +12,34 @@ import 'tables.dart';
 /// One instance is not safe to share between isolates, and a frame must be
 /// decoded to completion before the next one starts.
 class ZstdDecoder {
+  ZstdDecoder({this.maxOutputSize = defaultMaxOutputSize});
+
   static const int magic = 0xFD2FB528;
+
+  /// The largest output this decoder will allocate for one frame.
+  ///
+  /// `Frame_Content_Size` is up to a 64-bit number taken straight from the
+  /// input and it used to size the output buffer unchecked, so a sixteen-byte
+  /// frame could ask for four exbibytes. It is reachable by accident as well
+  /// as by design: one bit flipped in a real tile's frame descriptor moves
+  /// the content-size flag from 2 to 3, eight bytes of compressed data are
+  /// read as the size, and the eighth lands on the sign bit. That is a
+  /// `RangeError` for a negative length, or an `OutOfMemoryError` for a large
+  /// positive one, and both are `Error` rather than `Exception`, so a caller
+  /// writing `on ZstdException` does not catch either and the isolate dies.
+  ///
+  /// RFC 8878 section 3.1.1.1.2 lets a decoder refuse a frame that asks for
+  /// more memory than it is willing to give, which is the job of the window
+  /// descriptor this package skips. Allocating the output whole is why it can
+  /// skip it, and this is the bound that replaces it.
+  ///
+  /// A caller that knows the exact size should pass [decode]'s `expectedSize`
+  /// instead and get an exact check rather than a ceiling. The `.hgtz` reader
+  /// knows it: a block is `height * width * 2`.
+  static const int defaultMaxOutputSize = 64 * 1024 * 1024;
+
+  /// The ceiling this instance enforces. See [defaultMaxOutputSize].
+  final int maxOutputSize;
 
   /// The largest block a frame may contain, and so the most literals one
   /// block can hold.
@@ -98,6 +125,17 @@ class ZstdDecoder {
         'frame declares no content size and none was given',
       );
     }
+    // Before the allocation, and before any of it is trusted.
+    if (size < 0 || size > maxOutputSize) {
+      throw ZstdException('frame declares $size bytes, over the maximum');
+    }
+    // When the caller knows the size, the frame agreeing with it is the
+    // check. Left to the end, a frame declaring less decoded its own
+    // content happily and a frame declaring more allocated whatever it
+    // asked for first.
+    if (contentSize != null && expectedSize != null && size != expectedSize) {
+      throw ZstdException('frame declares $size bytes, not $expectedSize');
+    }
     final out = Uint8List(size);
 
     _huffman.log = 0;
@@ -118,7 +156,10 @@ class ZstdDecoder {
       final last = header & 1;
       final type = (header >> 1) & 3;
       final blockSize = header >> 3;
-      if (blockSize > maxBlockSize && type != 1) {
+      // Every type, RLE included. Its Block_Size is its regenerated size and
+      // the format bounds it like any other, and exempting it let a 97-byte
+      // input return 44 MB that a caller cannot tell from a good tile.
+      if (blockSize > maxBlockSize) {
         throw ZstdException('block of $blockSize bytes is over the maximum');
       }
 
@@ -153,12 +194,24 @@ class ZstdDecoder {
     }
 
     if (checksum == 1) {
-      // Parsed so the frame is consumed whole, but not verified. Every block
-      // in a .hgtz is its own frame and pyzstd writes none.
+      // Not verified yet. Required to be present, though: stepping the
+      // cursor over four bytes that were never there let a frame claim a
+      // checksum and supply none.
+      if (at + 4 > src.length) {
+        throw const ZstdException('truncated content checksum');
+      }
       at += 4;
     }
     if (written != out.length) {
       throw ZstdException('frame decoded to $written bytes, not ${out.length}');
+    }
+    // Reading one frame is the whole API, so anything after it is input this
+    // decoder does not understand. Nothing used to compare the cursor with
+    // the length, so a second frame, a trailing skippable frame, and four
+    // bytes of junk were all accepted and silently ignored: two frames
+    // concatenated returned the first one's bytes and raised nothing.
+    if (at != src.length) {
+      throw ZstdException('${src.length - at} bytes after the frame');
     }
 
     return out;
