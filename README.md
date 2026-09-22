@@ -7,9 +7,9 @@ an app that reads block-compressed elevation tiles on a phone would rather not
 carry a native library per platform to do it. Decompression only. There is no
 compressor and there is no plan for one.
 
-This is a feasibility spike, not a finished library. It decodes the real data
-it was written for, correctly and completely, and it is roughly four times
-slower than native zstd. See **Speed** below before depending on it.
+It decodes the real data it was written for, correctly and completely, and it
+is roughly four times slower than native zstd. See **Speed** below before
+depending on it.
 
 ## Using it
 
@@ -142,7 +142,37 @@ Run it yourself:
 
 ## Licence
 
-Not chosen yet.
+MIT. See [LICENSE](LICENSE).
+
+## Acknowledgements
+
+This is an independent implementation. It contains no code from libzstd, and
+nothing about its licence reaches this package. It would not exist without the
+following, and they are named here because that is where the debt actually is.
+
+**[RFC 8878](https://www.rfc-editor.org/rfc/rfc8878.html), "Zstandard
+Compression and the application/zstd Media Type"**, by Yann Collet and Murray
+Kucherawy, is the specification this was written from. Every table in
+`lib/src/tables.dart` was checked against section 3.1.1.3.2 entry by entry, and
+the FSE and Huffman decoders follow the reference algorithms it describes. A
+format specification written clearly enough to implement from is a gift, and
+this one is.
+
+**[Zstandard](https://github.com/facebook/zstd)**, by Yann Collet and
+contributors at Meta, is the format and the reference implementation. Its
+licence is BSD-3-Clause, and it obliges nothing here; it is named because
+without it there would be nothing to decode.
+
+**[pyzstd](https://pypi.org/project/pyzstd/)** wraps libzstd and is the oracle
+every test in this package is measured against. Correctness here means
+"agrees with libzstd, byte for byte", and pyzstd is how that is asked. The
+committed fixtures under `test/fixtures/corpus/` are output of the `zstd` CLI
+and of pyzstd, which is tool output rather than anything derived from their
+source.
+
+**The Dart team**, for making `int` an exact 64-bit integer on the VM and on
+AOT. The bit reader carries 56 bits in one and XXH64's multiplies wrap exactly,
+neither of which would be true on a platform with doubles underneath.
 
 ## Measured on the target device, 2026-09-21
 
