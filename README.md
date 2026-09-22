@@ -44,7 +44,7 @@ RFC 8878 is the specification. Of it:
 | Repeated offsets | Yes, including the no-literals shift. |
 | Content checksum | Parsed and **skipped, never verified**. |
 | Dictionaries | Refused. |
-| Skippable frames, several frames in one buffer | Only a *leading* skippable frame is refused, and only because the magic check fires. See **Known defects**. |
+| Skippable frames, several frames in one buffer | Refused. Reading one frame is the whole API, and input left over after it is an error. |
 | Streaming, or decoding part of a frame | Not offered. |
 
 It targets native Dart and not the web: the literals header reads a five-byte
@@ -53,37 +53,46 @@ Both are exact on the VM and on AOT, and neither is on JavaScript.
 
 ## Known defects
 
-Found by two audits on 2026-09-21, confirmed with reproducers, and **not yet
-fixed**. Nothing should depend on this package until they are.
+Found by two audits on 2026-09-21, each with a reproducer. Four are fixed; the
+fifth is the one that matters most and is still open.
 
-1. **`Frame_Content_Size` sizes the output allocation with no ceiling.** A
+### Open
+
+**The content checksum is parsed and never verified.** Over 600,000 mutations of
+real block data, 34% decoded into wrong bytes with no error raised. This is the
+only mechanism that would catch a wrong decode from anything else, which is what
+makes it the one worth closing. Two halves: verify the XXH64 when the flag is
+set, and have `hgtz.py` start writing one, which costs four bytes a
+block and a re-transcode of the archive.
+
+Narrower than it first looks for this project. the downloader verifies a
+SHA-256 over the whole container before it renames the `.part`, so a tile damaged
+on the way to the phone is already caught. What is left is corruption at rest
+after that check.
+
+### Fixed 2026-09-21
+
+1. **`Frame_Content_Size` sized the output allocation with no ceiling.** A
    16-byte frame can ask for 4 EiB. One bit flipped in the frame descriptor of a
    real tile gives `RangeError` or `OutOfMemoryError`, and neither is catchable
    as `ZstdException`, so the isolate dies. This is what the skipped
    `Window_Descriptor` was for: RFC 8878 §3.1.1.1.2 allows a decoder to refuse a
    frame asking for more memory than it will give. Require the declared size to
    be under a stated ceiling, and have the `.hgtz` reader pass the exact
-   `height * width * 2` it expects.
-2. **`fseDecodeInterleaved` writes three symbols in a pass that checks room for
-   two.** `fse.dart:210` guards on `at + 2 > outLimit` and the exhausted branch
-   writes a third, so a crafted Huffman weight stream indexes `_weights[256]`.
-   The reproducer is 53 bytes, and random mutation of a real tile found it
-   independently. The guard wants `at + 3`.
-3. **Several frames in one buffer decode to the first and return silently.** The
-   block loop breaks on the last block and nothing compares the cursor with the
-   input length, so a second frame, a trailing skippable frame, and four junk
-   bytes appended are all accepted and ignored. Require the cursor to have
-   reached the end.
-4. **RLE blocks skip the block-size ceiling.** `type != 1` exempts them, so 97
-   bytes of input returns 44 MB of output that a caller cannot tell from a good
-   tile.
-5. **The content checksum is parsed and never verified.** Over 600,000
-   mutations of real block data, 34% decoded into wrong bytes with no error
-   raised. A frame may also claim a checksum and supply none, because the four
-   bytes are stepped over rather than read. `hgtz.py` writes no checksum either,
-   so a corrupt tile on a phone becomes wrong elevation rather than an error.
-   This is the one that makes the rest systemic: it is the only mechanism that
-   would catch a wrong decode from anything else.
+   `height * width * 2` it expects. `ZstdDecoder` now takes a `maxOutputSize`,
+   64 MiB by default, and a caller passing `expectedSize` gets an exact check
+   against the frame's own figure instead.
+2. **`fseDecodeInterleaved` wrote three symbols in a pass that checked room for
+   two**, so a crafted Huffman weight stream indexed `_weights[256]`. The
+   reproducer is 53 bytes, and random mutation of a real tile found it
+   independently.
+3. **Several frames in one buffer decoded to the first and returned silently.**
+   Nothing compared the cursor with the input length, so a second frame, a
+   trailing skippable frame and four bytes of junk were all accepted and
+   ignored. A frame claiming a checksum could also supply none, because the four
+   bytes were stepped over rather than read.
+4. **RLE blocks skipped the block-size ceiling**, so 97 bytes of input returned
+   44 MB of output that a caller cannot tell from a good tile.
 
 Over-permissive against libzstd, with no wrong output, so lower priority: a
 compressed block over `blockSizeMax` is accepted, the Huffman weight table is
