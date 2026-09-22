@@ -14,6 +14,13 @@ class HuffmanTable {
   /// The largest table log the format allows for literals.
   static const int maxLog = 12;
 
+  /// One larger than the 255 weights a table may carry, deliberately.
+  ///
+  /// `fseDecodeInterleaved` guards each pass for the three symbols its
+  /// exhausted branches can write, so a 255-weight stream whose final pass
+  /// writes two has to be able to start that pass at 253. Shrinking this to
+  /// 255 looks like a tightening and would refuse every 255-weight table,
+  /// which the real elevation containers are full of.
   static const int _maxSymbols = 256;
 
   /// One entry per table slot: the symbol in the low byte, the code length

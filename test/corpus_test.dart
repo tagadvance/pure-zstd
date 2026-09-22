@@ -71,6 +71,39 @@ void main() {
     });
   });
 
+  group('a frame whose declared size is not the one asked for', () {
+    // A guard callers rest on, and it had no test:
+    // deleting the whole check left every other case green. A caller that
+    // knows the size, as the .hgtz reader does, gets an exact comparison
+    // against the frame's own figure rather than only the ceiling. Left to
+    // the end, a frame declaring less decoded its own content happily and a
+    // frame declaring more allocated whatever it asked for first.
+    for (final entry in corpus.where(
+      // Not a buffer holding more than one frame: this decoder refuses
+      // those whatever size it is told to expect.
+      (entry) =>
+          entry.legal &&
+          entry.expectedSize == null &&
+          entry.trailing == null &&
+          entry.size! > 1,
+    )) {
+      test('${entry.name} is refused when asked for one byte more', () {
+        expect(
+          () =>
+              ZstdDecoder().decode(entry.frame, expectedSize: entry.size! + 1),
+          throwsA(isA<ZstdException>()),
+        );
+      });
+
+      test('${entry.name} still decodes when asked for the size it has', () {
+        expect(
+          ZstdDecoder().decode(entry.frame, expectedSize: entry.size),
+          orderedEquals(entry.plain),
+        );
+      });
+    }
+  });
+
   group('a frame declaring no content size', () {
     final entry = corpus.singleWhere((entry) => entry.name == 'nofcs_windowed');
     final size = entry.expectedSize!;

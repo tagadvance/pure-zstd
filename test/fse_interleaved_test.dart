@@ -38,18 +38,26 @@ void main() {
       );
     });
 
-    test('fills the buffer exactly when there is room for the last pass', () {
-      final table = FseTable(6);
-      readFseTable(table, description, 0, description.length, 255);
+    test(
+      'writes exactly what the stream encodes, and knows where that ends',
+      () {
+        // The old version of this asserted only that the count was over 256
+        // and under 1024, which passes with the guard at `at + 2`, at
+        // `at + 3`, or removed entirely. This stream encodes 257 symbols, and
+        // the boundary is the whole point: a buffer of exactly 257 takes it
+        // and one of 256 does not.
+        int run(int limit) {
+          final table = FseTable(6);
+          readFseTable(table, description, 0, description.length, 255);
+          final bits = ReverseBitReader()..reset(stream, 0, stream.length);
 
-      // Same stream, a buffer with slack. The count it returns must be the
-      // symbols it actually wrote, so the last pass cannot have been longer
-      // than the room the check left.
-      final bits = ReverseBitReader()..reset(stream, 0, stream.length);
-      final room = Uint8List(1024);
-      final written = fseDecodeInterleaved(table, bits, room, 0, room.length);
-      expect(written, greaterThan(256));
-      expect(written, lessThanOrEqualTo(room.length));
-    });
+          return fseDecodeInterleaved(table, bits, Uint8List(1024), 0, limit);
+        }
+
+        expect(run(1024), 257);
+        expect(run(257), 257);
+        expect(() => run(256), throwsA(isA<ZstdException>()));
+      },
+    );
   });
 }

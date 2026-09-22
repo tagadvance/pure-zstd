@@ -35,8 +35,11 @@ class ZstdDecoder {
   /// skip it, and this is the bound that replaces it.
   ///
   /// A caller that knows the exact size should pass [decode]'s `expectedSize`
-  /// instead and get an exact check rather than a ceiling. The `.hgtz` reader
-  /// knows it: a block is `height * width * 2`.
+  /// as well, and gets an exact check *in addition to* this ceiling rather
+  /// than instead of it: a frame declaring 70 MiB is refused here before the
+  /// two are ever compared. Raising it takes a `ZstdDecoder` of one's own,
+  /// since the top-level [zstdDecode] does not offer it. The `.hgtz` reader
+  /// knows its size: a block is `height * width * 2`.
   static const int defaultMaxOutputSize = 64 * 1024 * 1024;
 
   /// The ceiling this instance enforces. See [defaultMaxOutputSize].
