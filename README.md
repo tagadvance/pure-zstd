@@ -42,7 +42,7 @@ RFC 8878 is the specification. Of it:
 | Huffman weights | Both the direct nibble form and the FSE-coded form. |
 | Sequence tables | Predefined, RLE, FSE-compressed and repeat, for all three of literal length, match length and offset. |
 | Repeated offsets | Yes, including the no-literals shift. |
-| Content checksum | Parsed and **skipped, never verified**. |
+| Content checksum | Verified. XXH64 over the output, compared with the stored low 32 bits. Hashed only when the frame carries one. |
 | Dictionaries | Refused. |
 | Skippable frames, several frames in one buffer | Refused. Reading one frame is the whole API, and input left over after it is an error. |
 | Streaming, or decoding part of a frame | Not offered. |
@@ -51,26 +51,16 @@ It targets native Dart and not the web: the literals header reads a five-byte
 field with a 32-bit shift, and the bit reader carries 56 bits in an `int`.
 Both are exact on the VM and on AOT, and neither is on JavaScript.
 
-## Known defects
+## Defects found and closed, 2026-09-21
 
-Found by two audits on 2026-09-21, each with a reproducer. Four are fixed; the
-fifth is the one that matters most and is still open.
+Two audits, each finding with a reproducer. All five are fixed.
 
-### Open
-
-**The content checksum is parsed and never verified.** Over 600,000 mutations of
-real block data, 34% decoded into wrong bytes with no error raised. This is the
-only mechanism that would catch a wrong decode from anything else, which is what
-makes it the one worth closing. Two halves: verify the XXH64 when the flag is
-set, and have `hgtz.py` start writing one, which costs four bytes a
-block and a re-transcode of the archive.
-
-Narrower than it first looks for this project. the downloader verifies a
-SHA-256 over the whole container before it renames the `.part`, so a tile damaged
-on the way to the phone is already caught. What is left is corruption at rest
-after that check.
-
-### Fixed 2026-09-21
+One decision is still open, and it is not a defect in this package:
+`hgtz.py` writes no checksum, so nothing in a `.hgtz` is covered by
+the verification below. Making it write one costs four bytes a block and a
+re-transcode of every tile. It is narrower than it sounds, because
+the downloader verifies a SHA-256 over the whole container before it keeps the
+download, so only corruption at rest on the phone is uncovered.
 
 1. **`Frame_Content_Size` sized the output allocation with no ceiling.** A
    16-byte frame can ask for 4 EiB. One bit flipped in the frame descriptor of a
@@ -93,6 +83,12 @@ after that check.
    bytes were stepped over rather than read.
 4. **RLE blocks skipped the block-size ceiling**, so 97 bytes of input returned
    44 MB of output that a caller cannot tell from a good tile.
+5. **The content checksum was parsed and never verified.** Over 600,000
+   mutations of real block data, 34% decoded into wrong bytes with no error
+   raised, because a damaged match or literal length usually still produces
+   plausible output of the right length. Every other guard catches a frame that
+   cannot be parsed; this is the only one that catches a frame that parses and
+   is wrong.
 
 Over-permissive against libzstd, with no wrong output, so lower priority: a
 compressed block over `blockSizeMax` is accepted, the Huffman weight table is
