@@ -1,0 +1,5 @@
+# Destined for its own repository, so it carries its own rules rather than
+# relying on the enclosing one.
+.dart_tool/
+# A library, not an application: the lockfile is the consumer's business.
+pubspec.lock
