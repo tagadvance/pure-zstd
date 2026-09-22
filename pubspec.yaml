@@ -1,7 +1,25 @@
 name: pure_zstd
-description: A pure Dart zstd decompressor, with no native dependency.
-version: 0.0.1
+description: >-
+  A zstd decompressor written in plain Dart. Decodes RFC 8878 frames with no
+  native library and no platform channel, verified against libzstd.
+version: 0.1.0
+
+# Fill these in with the new repository before the first publish. pub.dev
+# scores a package on having them and the score is most of its discoverability;
+# a published version can be retracted but never deleted, so they are worth
+# getting right the first time.
+repository: https://github.com/tagadvance/pure_zstd
+issue_tracker: https://github.com/tagadvance/pure_zstd/issues
+
+# Remove this line to publish. It is here so an accidental `dart pub publish`
+# from inside the original checkout cannot succeed.
 publish_to: none
+
+topics:
+  - zstd
+  - zstandard
+  - compression
+  - decompression
 
 environment:
   sdk: ^3.8.0
