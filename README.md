@@ -99,3 +99,28 @@ Run it yourself:
 ## Licence
 
 Not chosen yet.
+
+## Measured on the target device, 2026-09-21
+
+Sixteen real 256x256 blocks lifted out of `path/to/srtm1z/N39W105.hgtz`,
+131,072 bytes of output each, the same blocks in every row so the numbers are
+comparable. Median of 960 timed calls after 320 warm-up calls.
+
+| where | mode | median | MB/s | 113-block sweep |
+| --- | --- | --- | --- | --- |
+| Pixel 10 Pro XL | **profile, AOT** | **0.414 ms** | 302 | **47 ms** |
+| Pixel 10 Pro XL | debug, JIT | 0.540 ms | 231 | 61 ms |
+| this laptop | AOT | 0.917 ms | 136 | 104 ms |
+| this laptop | JIT | 1.125 ms | 111 | 127 ms |
+
+The phone is about twice as fast as the laptop at this, which is why the
+desktop figures in the commit message read worse than reality.
+
+Native, for scale: pyzstd on the laptop is 0.175 ms on comparable blocks. That
+is a Python C extension rather than Dart FFI, so take it as an indication. No
+native-on-phone figure was taken.
+
+Do not benchmark against `test/fixtures/N51E000.hgtz`. Its samples are a
+synthetic pattern that compresses to almost no sequences, and decode cost
+tracks sequence count, so it reads about six times too fast. That mistake was
+made once already.
