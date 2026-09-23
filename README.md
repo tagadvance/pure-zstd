@@ -102,10 +102,6 @@ Run it yourself:
 
     dart compile exe benchmark/bench.dart -o /tmp/bench && /tmp/bench
 
-## Licence
-
-MIT. See [LICENSE](LICENSE).
-
 ## Acknowledgements
 
 This is an independent implementation. It contains no code from libzstd, and
