@@ -65,18 +65,14 @@ void main() {
     ),
   };
 
-  group(
-    'a frame libzstd wrote decodes back to what went in',
-    () {
-      for (final shape in shapes.entries) {
-        test(shape.key, () {
-          final frame = zstdCli(shape.value.arguments, shape.value.input);
-          final out = ZstdDecoder().decode(frame);
-          expect(out.length, shape.value.input.length);
-          expect(out, orderedEquals(shape.value.input));
-        }, timeout: const Timeout(Duration(minutes: 2)));
-      }
-    },
-    skip: hasZstdCli ? null : 'the zstd CLI is not on the path',
-  );
+  group('a frame libzstd wrote decodes back to what went in', () {
+    for (final shape in shapes.entries) {
+      test(shape.key, () {
+        final frame = zstdCli(shape.value.arguments, shape.value.input);
+        final out = ZstdDecoder().decode(frame);
+        expect(out.length, shape.value.input.length);
+        expect(out, orderedEquals(shape.value.input));
+      }, timeout: const Timeout(Duration(minutes: 2)));
+    }
+  }, skip: hasZstdCli ? null : 'the zstd CLI is not on the path');
 }
