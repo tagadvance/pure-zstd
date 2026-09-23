@@ -1,5 +1,11 @@
 # pure_zstd
 
+[![CI](https://github.com/tagadvance/pure-zstd/actions/workflows/ci.yml/badge.svg)](https://github.com/tagadvance/pure-zstd/actions/workflows/ci.yml)
+[![pub package](https://img.shields.io/pub/v/pure_zstd.svg)](https://pub.dev/packages/pure_zstd)
+[![pub points](https://img.shields.io/pub/points/pure_zstd)](https://pub.dev/packages/pure_zstd/score)
+[![Dart](https://img.shields.io/badge/dart-%3E%3D3.8-blue)](https://dart.dev)
+[![License: MIT](https://img.shields.io/github/license/tagadvance/pure-zstd)](LICENSE)
+
 A zstd decompressor in plain Dart, with no native dependency.
 
 It exists because every zstd binding on pub.dev is a wrapper over libzstd, and
