@@ -167,3 +167,7 @@ Do not benchmark against `test/fixtures/N51E000.hgtz`. Its samples are a
 synthetic pattern that compresses to almost no sequences, and decode cost
 tracks sequence count, so it reads about six times too fast. That mistake was
 made once already.
+
+---
+
+If this saved you some time, please consider [sponsoring the work](https://github.com/sponsors/tagadvance).
