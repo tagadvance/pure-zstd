@@ -12,8 +12,8 @@ Dart tests read that manifest and never carry a literal of their own.
 
     ./tool/make_corpus.py          # regenerates test/fixtures/corpus
 
-Needs pyzstd, the zstd CLI, and for the one real-tile case a readable
-a directory of .hgtz containers, given in HGTZ_TILE.
+Needs pyzstd, the zstd CLI, and for the one real-tile case a .hgtz
+container named in HGTZ_TILE.
 """
 
 import gzip
