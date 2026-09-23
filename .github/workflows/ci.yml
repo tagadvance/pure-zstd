@@ -21,6 +21,7 @@ jobs:
       - run: dart pub get
       - run: dart format --output=none --set-exit-if-changed .
       - run: dart analyze --fatal-infos
+      - run: dart run example/pure_zstd_example.dart
       - run: dart pub publish --dry-run
 
   test:
