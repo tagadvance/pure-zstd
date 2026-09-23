@@ -7,15 +7,20 @@ version: 0.1.0
 repository: https://github.com/tagadvance/pure-zstd
 issue_tracker: https://github.com/tagadvance/pure-zstd/issues
 
-# Remove this line to publish. A published version can be retracted but never
-# deleted, so it stays until the first release is deliberate.
-publish_to: none
-
 topics:
   - zstd
   - zstandard
   - compression
   - decompression
+
+# Not the web: the bit reader carries 56 bits in an int, and XXH64 relies on
+# 64-bit multiplication wrapping, neither of which holds under JavaScript.
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  windows:
 
 environment:
   sdk: ^3.8.0
