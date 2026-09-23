@@ -23,8 +23,8 @@ one frame per call.
 
 Correctness is measured against libzstd through pyzstd rather than against
 expectations written by hand: 2,615 blocks of real elevation data across 32
-containers, plus a committed corpus of 24 fixtures covering the format branches
-that real data never reaches. 103 tests.
+containers, plus a committed corpus of 23 cases covering the format branches
+that real data never reaches. 131 tests.
 
 Roughly four times slower than native zstd. On a Pixel 10 Pro XL, profile AOT,
 a 128 KiB block decodes in 0.414 ms, which is 302 MB/s.
