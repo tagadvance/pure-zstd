@@ -13,33 +13,17 @@ import 'xxhash.dart';
 /// One instance is not safe to share between isolates, and a frame must be
 /// decoded to completion before the next one starts.
 class ZstdDecoder {
+  /// Creates a decoder that refuses any frame larger than [maxOutputSize].
   ZstdDecoder({this.maxOutputSize = defaultMaxOutputSize});
 
+  /// The four bytes every zstd frame starts with, read little-endian.
   static const int magic = 0xFD2FB528;
 
-  /// The largest output this decoder will allocate for one frame.
+  /// The largest output a decoder allocates for one frame unless told
+  /// otherwise, since a frame header can claim up to 2^64 bytes.
   ///
-  /// `Frame_Content_Size` is up to a 64-bit number taken straight from the
-  /// input and it used to size the output buffer unchecked, so a sixteen-byte
-  /// frame could ask for four exbibytes. It is reachable by accident as well
-  /// as by design: one bit flipped in a real tile's frame descriptor moves
-  /// the content-size flag from 2 to 3, eight bytes of compressed data are
-  /// read as the size, and the eighth lands on the sign bit. That is a
-  /// `RangeError` for a negative length, or an `OutOfMemoryError` for a large
-  /// positive one, and both are `Error` rather than `Exception`, so a caller
-  /// writing `on ZstdException` does not catch either and the isolate dies.
-  ///
-  /// RFC 8878 section 3.1.1.1.2 lets a decoder refuse a frame that asks for
-  /// more memory than it is willing to give, which is the job of the window
-  /// descriptor this package skips. Allocating the output whole is why it can
-  /// skip it, and this is the bound that replaces it.
-  ///
-  /// A caller that knows the exact size should pass [decode]'s `expectedSize`
-  /// as well, and gets an exact check *in addition to* this ceiling rather
-  /// than instead of it: a frame declaring 70 MiB is refused here before the
-  /// two are ever compared. Raising it takes a `ZstdDecoder` of one's own,
-  /// since the top-level [zstdDecode] does not offer it. The `.hgtz` reader
-  /// knows its size: a block is `height * width * 2`.
+  /// The top-level [zstdDecode] always uses it; raising it takes a
+  /// [ZstdDecoder] of one's own.
   static const int defaultMaxOutputSize = 64 * 1024 * 1024;
 
   /// The ceiling this instance enforces. See [defaultMaxOutputSize].
@@ -74,10 +58,12 @@ class ZstdDecoder {
   int _literalAt = 0;
   int _literalEnd = 0;
 
-  /// Decodes one frame.
+  /// Decodes exactly one frame, which must be the whole of [src], into a new
+  /// list.
   ///
-  /// [expectedSize] is only needed when the frame header omits its content
-  /// size, which the containers this was written for never do.
+  /// [expectedSize] is required when the frame omits its content size, and
+  /// otherwise must match it exactly. Throws a [ZstdException] for any frame
+  /// that is malformed, too large, fails its checksum, or uses a dictionary.
   Uint8List decode(Uint8List src, {int? expectedSize}) {
     if (src.length < 6) {
       throw const ZstdException('too short to be a zstd frame');
@@ -151,9 +137,7 @@ class ZstdDecoder {
     _repeat2 = 4;
     _repeat3 = 8;
 
-    // Only when the frame carries one. Hashing every frame would cost the
-    // .hgtz reader throughput it has no use for, since pyzstd writes no
-    // checksum and the container's own SHA-256 is verified on download.
+    // Only when the frame carries one, so a frame without pays nothing.
     final hash = checksum == 1 ? (_hash..reset()) : null;
 
     var written = 0;
@@ -674,7 +658,7 @@ class ZstdDecoder {
 
 /// Decodes one zstd frame into a new list.
 ///
-/// Allocates a decoder per call. Decoding many frames, which is what reading
-/// a tile does, should hold a [ZstdDecoder] instead.
+/// Allocates a decoder per call, so decoding many frames should hold a
+/// [ZstdDecoder] instead. Throws as [ZstdDecoder.decode] does.
 Uint8List zstdDecode(Uint8List src, {int? expectedSize}) =>
     ZstdDecoder().decode(src, expectedSize: expectedSize);

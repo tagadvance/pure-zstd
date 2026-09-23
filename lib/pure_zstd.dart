@@ -1,7 +1,7 @@
 /// A pure Dart zstd decompressor.
 ///
-/// Decompression only, and only the subset of RFC 8878 that the elevation
-/// containers this was written for use. See the README for what is left out.
+/// Decompression only, one RFC 8878 frame per call, on native platforms. It
+/// refuses dictionaries and skippable frames; see the README for the rest.
 library;
 
 export 'src/decoder.dart' show ZstdDecoder, zstdDecode;
